@@ -1,0 +1,14 @@
+numpy
+pandas
+
+scikit-learn
+dlib-bin
+setuptools
+
+supabase
+bcrypt
+
+segno
+pillow
+
+streamlit
