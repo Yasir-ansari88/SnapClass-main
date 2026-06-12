@@ -1,5 +1,6 @@
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+IST = timezone(timedelta(hours=5, minutes=30))
 import pandas as pd
 import streamlit as st
 import time
