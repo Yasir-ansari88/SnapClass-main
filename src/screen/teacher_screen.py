@@ -150,7 +150,7 @@ def teacher_tab_take_attendance():
 
                     results, attendance_to_log  = [], []
 
-                    current_timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+                    current_timestamp = datetime.now(IST).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
 
 
                     for node in enrolled_students:
@@ -235,9 +235,17 @@ def teacher_tab_attendance_record():
     data = []
     for r in records:
         ts = r.get('timestamp')
+        if ts:
+            ist_time = datetime.fromisoformat(ts).astimezone(IST)
+            ts_group = ist_time.strftime("%Y-%m-%d %H:%M:%S")
+            time_str = ist_time.strftime("%Y-%m-%d %I:%M %p")
+        else:
+            ts_group = None
+            time_str = "N/A"
+
         data.append({
             "ts_group": ts.split(".")[0] if ts else None,
-            "Time": datetime.fromisoformat(ts).strftime("%Y-%m-%d %I:%M %p") if ts else "N/A",
+            "Time": datetime.fromisoformat(ts).astimezone(IST).strftime("%Y-%m-%d %I:%M %p") if ts else "N/A",
             "Subject": r['subjects']['name'],
             "Subject Code": r['subjects']['subject_code'],
             "is_present": bool(r.get('is_present', False))
