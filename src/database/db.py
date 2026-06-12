@@ -79,3 +79,7 @@ def create_attendance(logs):
 def get_attendance_for_teacher(teacher_id):
     response = supabase.table('attendance_logs').select("*, subjects!attendance_logs_subject_id_fkey(*)").eq('subjects.teacher_id', teacher_id).execute()
     return response.data
+
+def delete_subject(subject_code):
+    response = supabase.table('subjects').delete().eq('subject_code', subject_code).execute()
+    return response.data

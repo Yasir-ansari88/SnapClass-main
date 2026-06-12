@@ -2,7 +2,7 @@ import streamlit as st
 from src.ui.base_layout import style_background_dashbord, style_base_layout
 from src.components.header import header_dashbord
 from src.components.footer import footer_dashbord
-from src.piplines.face_pipeline import predict_attendance, get_face_embeddings, train_classifier
+from src.piplines.face_pipeline import predict_attendance, get_face_embeddings, train_classifier, identify_face_for_login
 from src.piplines.voice_pipeline import get_voice_embedding
 from src.database.db import get_all_students, create_student, get_student_subjects, get_student_attendance, unenroll_student_to_subject
 from src.components.dialog_enroll import enroll_dialog
@@ -104,26 +104,26 @@ def student_screen():
         img = np.array(Image.open(photo_source))
 
         with st.spinner('AI is Scanning.....'):
-            detected, all_ids, num_faces = predict_attendance(img)
+            student_id, num_faces = identify_face_for_login(img)  # ← NEW FUNCTION
 
             if num_faces == 0:
                 st.warning('Face not found')
             elif num_faces > 1:
                 st.warning('Multiple faces found')
             else:
-                if detected:
-                    student_id = list(detected.keys())[0]
+                if student_id:
+                    # existing student → login
                     all_students = get_all_students()
                     student = next((s for s in all_students if s['student_id'] == student_id), None)
-
                     if student:
                         st.session_state.is_logged_in = True
                         st.session_state.user_role = 'student'
                         st.session_state.student_data = student
-                        st.toast(f"Welcome Back {student['name']}")
+                        st.toast(f"Welcome Back {student['name']}",icon="👋")
                         time.sleep(1)
                         st.rerun()
                 else:
+                    # new user → registration
                     st.info('Face not recognized! You might be a new student!')
                     show_registration = True
     if show_registration:

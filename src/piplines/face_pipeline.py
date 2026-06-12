@@ -101,3 +101,39 @@ def predict_attendance(class_image_np):
 
     return detected_student, all_students, len(encodings)
 
+def identify_face_for_login(image_np):
+    encodings = get_face_embeddings(image_np)
+
+    if not encodings:
+        return None, len(encodings)  
+
+    if len(encodings) > 1:
+        return None, len(encodings) 
+
+    encoding = encodings[0]
+    model_data = get_trained_model()
+
+    if not model_data:
+        return None, 1  
+
+    clf = model_data['clf']
+    x_train = model_data['X']
+    y_train = model_data['Y']
+
+    all_students = sorted(list(set(y_train)))
+
+    if len(all_students) >= 2:
+        predicted_id = int(clf.predict(encoding.reshape(1, -1))[0])
+    else:
+        predicted_id = int(all_students[0])
+
+    student_embedding = x_train[y_train.index(predicted_id)]
+    distance = np.linalg.norm(student_embedding - encoding)
+
+    THRESHOLD = 0.45  
+
+    if distance <= THRESHOLD:
+        return predicted_id, 1  
+    else:
+        return None, 1  
+

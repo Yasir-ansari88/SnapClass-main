@@ -2,11 +2,12 @@ import numpy as np
 from datetime import datetime
 import pandas as pd
 import streamlit as st
+import time
 
 from src.ui.base_layout import style_background_dashbord, style_base_layout
 from src.components.header import header_dashbord
 from src.components.footer import footer_dashbord
-from src.database.db import check_teacher_exist, create_teacher, teacher_login, get_teacher_subjects, get_attendance_for_teacher
+from src.database.db import check_teacher_exist, create_teacher, teacher_login, get_teacher_subjects, get_attendance_for_teacher, delete_subject
 from src.components.dialog_create_subject import create_subject_dialoge
 from src.components.dialog_share_subject import share_subject_dialog
 from src.components.subject_card import subject_card
@@ -182,13 +183,10 @@ def teacher_tab_manage_subjects():
     col1, col2 = st.columns(2)
     with col1:
         st.header('Manage Subjects', width='stretch')
-
     with col2:
         if st.button('Create New Subject', width='stretch'):
             create_subject_dialoge(teacher_id)
 
-
-    # LIST all SUBJECTS
     subjects = get_teacher_subjects(teacher_id)
     if subjects:
         for sub in subjects:
@@ -196,57 +194,62 @@ def teacher_tab_manage_subjects():
                 ("👨‍🎓", "Students", sub['total_students']),
                 ("🕰️", "Classes", sub['total_classes']),
             ]
-        def share_btn():
-            if st.button(f"Share Code: {sub['name']}", key=f"share_{sub['subject_code']}", icon=":material/share:"):
-                share_subject_dialog(sub['name'], sub['subject_code'])
-            st.space()
 
-        subject_card(
-            name = sub['name'],
-            code = sub['subject_code'],
-            section = sub['section'],
-            stats=stats,
-            footer_callback=share_btn
-        )
+            def make_footer(s):
+                def footer():
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button(f"Share Code: {s['name']}", key=f"share_{s['subject_code']}", icon=":material/share:", width='stretch'):
+                            share_subject_dialog(s['name'], s['subject_code'])
+                    with col2:
+                        if st.button(f"Delete", key=f"delete_{s['subject_code']}",icon=":material/delete:",type='tertiary', width = 'stretch'):
+                            delete_subject(s['subject_code'])
+                            st.toast(f"'{s['name']}' deleted!")
+                            time.sleep(1)
+                            st.rerun()
+                return footer
+
+            subject_card(
+                name=sub['name'],
+                code=sub['subject_code'],
+                section=sub['section'],
+                stats=stats,
+                footer_callback=make_footer(sub)  # ← ek hi baar
+            )
+            st.space()
     else:
         st.info("NO SUBJECTS FOUND. CREATE ONE ABOVE")
 
 
 def teacher_tab_attendance_record():
     st.header('Attendance Records')
-
+    st.space()
     teacher_id = st.session_state.teacher_data['teacher_id']
-
     records = get_attendance_for_teacher(teacher_id)
 
     if not records:
+        st.info("No attendance records found.")
         return
     
     data = []
-
     for r in records:
         ts = r.get('timestamp')
-
         data.append({
             "ts_group": ts.split(".")[0] if ts else None,
-            "Time": datetime.fromisoformat(ts).strftime("%Y-%m-%d %I:%M %p") if ts else "N'A",
+            "Time": datetime.fromisoformat(ts).strftime("%Y-%m-%d %I:%M %p") if ts else "N/A",
             "Subject": r['subjects']['name'],
-            "Subject Code":r['subjects']['subject_code'],
+            "Subject Code": r['subjects']['subject_code'],
             "is_present": bool(r.get('is_present', False))
         })
 
-
     df = pd.DataFrame(data)
-
-
 
     summary = (
         df.groupby(['ts_group', 'Time', 'Subject', 'Subject Code'])
         .agg(
-            Present_Count = ('is_present', 'sum'),
-            Total_Count =('is_present', 'count')
+            Present_Count=('is_present', 'sum'),
+            Total_Count=('is_present', 'count')
         ).reset_index()
-
     )
 
     summary['Attendance Stats'] = (
@@ -254,11 +257,23 @@ def teacher_tab_attendance_record():
         + summary['Total_Count'].astype(str) + ' Students'
     )
 
-    display_df = ( summary.sort_values(by='ts_group' ,ascending=False)
-                  [['Time', 'Subject', 'Subject Code', 'Attendance Stats']]
-                  )
-    
-    st.dataframe(display_df, width='stretch', hide_index=True)
+    summary = summary.sort_values(by='ts_group', ascending=False)
+
+    # ── TABS ──
+    tab1, tab2 = st.tabs(["📋 Combined", "📚 Subject-wise"], width= 'stretch')
+    st.space()
+
+    with tab1:
+        display_df = summary[['Time', 'Subject', 'Subject Code', 'Attendance Stats']]
+        st.dataframe(display_df, width='stretch', hide_index=True)
+
+    with tab2:
+        subjects = summary['Subject'].unique().tolist()
+        selected = st.selectbox("Select Subject", subjects)
+        
+        filtered = summary[summary['Subject'] == selected]
+        display_df = filtered[['Time', 'Subject Code', 'Attendance Stats']]
+        st.dataframe(display_df, width='stretch', hide_index=True)
     
 
 def login_teacher(username, password,):
